@@ -1,0 +1,7 @@
+RAIDVol Write Performance Benchmark
+-----------------------------------
+RAID-0: wrote 1000 blocks in 0.008725 seconds
+RAID-1: wrote 1000 blocks in 0.011492 seconds
+RAID-5: wrote 1000 blocks in 0.016878 seconds
+-----------------------------------
+Benchmark completed.

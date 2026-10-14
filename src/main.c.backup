@@ -1,0 +1,98 @@
+
+#include "raidvol.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+
+static int test_volume(RaidLevel level, int devices)
+{
+    const char *raid0_paths[] = {
+        "raid0_disk0.img",
+        "raid0_disk1.img"
+    };
+
+    const char *raid1_paths[] = {
+        "raid1_disk0.img",
+        "raid1_disk1.img"
+    };
+
+    const char *raid5_paths[] = {
+        "raid5_disk0.img",
+        "raid5_disk1.img",
+        "raid5_disk2.img"
+    };
+
+    const char **paths;
+
+    if (level == RAID0)
+        paths = raid0_paths;
+    else if (level == RAID1)
+        paths = raid1_paths;
+    else
+        paths = raid5_paths;
+
+    RaidVolume volume;
+
+    printf("\nTesting RAID-%d...\n", (int)level);
+
+    if (raidvol_create(
+            &volume, level, paths, devices, 64, 4) < 0) {
+        printf("Volume creation FAILED\n");
+        return 1;
+    }
+
+    unsigned char written[RAIDVOL_BLOCK_SIZE];
+    unsigned char readback[RAIDVOL_BLOCK_SIZE];
+
+    for (uint64_t block = 0;
+         block < volume.virtual_blocks; block++) {
+
+        for (int j = 0; j < RAIDVOL_BLOCK_SIZE; j++)
+            written[j] = (unsigned char)((block + j) % 256);
+
+        if (raidvol_write_block(&volume, block, written) < 0) {
+            printf("WRITE FAILED at block %llu\n",
+                   (unsigned long long)block);
+            raidvol_close(&volume);
+            return 1;
+        }
+    }
+
+    for (uint64_t block = 0;
+         block < volume.virtual_blocks; block++) {
+
+        for (int j = 0; j < RAIDVOL_BLOCK_SIZE; j++)
+            written[j] = (unsigned char)((block + j) % 256);
+
+        if (raidvol_read_block(&volume, block, readback) < 0 ||
+            memcmp(written, readback, RAIDVOL_BLOCK_SIZE) != 0) {
+            printf("VERIFY FAILED at block %llu\n",
+                   (unsigned long long)block);
+            raidvol_close(&volume);
+            return 1;
+        }
+    }
+
+    printf("Blocks verified: %llu\n",
+           (unsigned long long)volume.virtual_blocks);
+    printf("Verification: PASS\n");
+
+    raidvol_close(&volume);
+    return 0;
+}
+
+int main(void)
+{
+    if (test_volume(RAID0, 2) != 0)
+        return 1;
+
+    if (test_volume(RAID1, 2) != 0)
+        return 1;
+
+    if (test_volume(RAID5, 3) != 0)
+        return 1;
+
+    printf("\nAll basic RAID tests PASSED!\n");
+    return 0;
+}
